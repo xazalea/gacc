@@ -108,11 +108,20 @@ This setup uses `@sparticuz/chromium-min` which is a minimal Chromium build desi
 
 **Important Notes:**
 
-1. **Function Size**: Should now be under 30MB with `chromium-min`
+1. **Function Size**: Ultra-minimal code bundle (<5MB), Chromium loaded at runtime
 2. **Execution Time**: 
    - Vercel Hobby: 10 seconds (may not be enough for full flow)
    - Vercel Pro: 60 seconds (recommended)
 3. **Memory**: Set to 1024MB in `vercel.json` for optimal performance
+
+**Fixing libnss3.so Error:**
+
+If you encounter the `libnss3.so: cannot open shared object file` error, add this environment variable in Vercel:
+
+- **Key**: `AWS_LAMBDA_JS_RUNTIME`
+- **Value**: `nodejs22.x`
+
+This helps Vercel include the necessary system libraries for Chromium. Go to your Vercel project settings → Environment Variables → Add the variable above.
 
 ## Project Structure
 
