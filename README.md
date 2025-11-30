@@ -90,9 +90,19 @@ The API endpoint is available at:
 ### Vercel Configuration
 
 The project uses:
-- `@sparticuz/chromium` for serverless Chrome
-- `puppeteer-core` for browser automation
+- `playwright-core` for browser automation (with Browserless.io service)
 - Next.js API routes for the backend
+
+**Required Setup for Vercel:**
+
+1. **Get a Browserless.io API Key** (Free tier available):
+   - Sign up at https://www.browserless.io/
+   - Get your API token from the dashboard
+   - Add it to Vercel environment variables:
+     - `BROWSERLESS_URL`: `https://chrome.browserless.io` (or your self-hosted instance)
+     - `BROWSERLESS_TOKEN`: Your API token
+
+2. **Alternative**: Self-host Browserless.io on Railway, Render, or similar platform
 
 **Note**: For Vercel Pro plan, set `maxDuration` to 60 seconds in the API route. For Hobby plan, the limit is 10 seconds which may not be sufficient.
 
