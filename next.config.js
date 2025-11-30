@@ -5,10 +5,7 @@ const nextConfig = {
       'puppeteer-core',
       '@sparticuz/chromium-min',
       'puppeteer-extra',
-      'puppeteer-extra-plugin',
       'puppeteer-extra-plugin-stealth',
-      'clone-deep',
-      'merge-deep',
     ],
   },
   webpack: (config, { isServer }) => {
@@ -16,8 +13,7 @@ const nextConfig = {
       config.externals = [
         ...(config.externals || []),
         '@sparticuz/chromium-min',
-        // 'puppeteer-extra',
-        // 'puppeteer-extra-plugin-stealth',
+        'puppeteer-core',
       ];
       config.optimization = { ...config.optimization, minimize: true };
     }
