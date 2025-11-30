@@ -1,26 +1,30 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
+    serverComponentsExternalPackages: ['puppeteer-core'],
   },
   webpack: (config, { isServer }) => {
     if (isServer) {
-      // Exclude chromium from webpack bundling to reduce bundle size
+      // Exclude everything possible to minimize bundle
       config.externals = [
         ...(config.externals || []), 
         '@sparticuz/chromium',
+        'fs',
+        'path',
+        'os',
+        'https',
       ];
       
-      // Minimize bundle size
+      // Aggressive minimization
       config.optimization = {
         ...config.optimization,
         minimize: true,
+        usedExports: true,
+        sideEffects: false,
       };
     }
     return config;
   },
-  // Reduce output size
-  output: 'standalone',
 }
 
 module.exports = nextConfig
