@@ -22,18 +22,52 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
     const isProduction = process.env.VERCEL === '1';
     
     if (isProduction) {
+      // For Vercel, configure Chromium with minimal dependencies
+      let chromiumPath: string;
+      try {
+        chromiumPath = await chromium.executablePath();
+      } catch (error) {
+        throw new Error('Failed to get Chromium executable path. This may be a Vercel runtime limitation.');
+      }
+      
+      // Use minimal args to reduce dependency issues
+      const args = [
+        ...chromium.args,
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+        '--disable-extensions',
+        '--single-process',
+        '--disable-background-networking',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-breakpad',
+        '--disable-client-side-phishing-detection',
+        '--disable-component-update',
+        '--disable-default-apps',
+        '--disable-features=TranslateUI',
+        '--disable-hang-monitor',
+        '--disable-ipc-flooding-protection',
+        '--disable-popup-blocking',
+        '--disable-prompt-on-repost',
+        '--disable-renderer-backgrounding',
+        '--disable-sync',
+        '--disable-translate',
+        '--metrics-recording-only',
+        '--no-first-run',
+        '--safebrowsing-disable-auto-update',
+        '--enable-automation',
+        '--password-store=basic',
+        '--use-mock-keychain',
+      ];
+      
       browser = await puppeteer.launch({
-        args: [
-          ...chromium.args,
-          '--disable-gpu',
-          '--disable-dev-shm-usage',
-          '--disable-setuid-sandbox',
-          '--no-sandbox',
-          '--single-process',
-        ],
-        defaultViewport: chromium.defaultViewport,
-        executablePath: await chromium.executablePath(),
-        headless: chromium.headless,
+        args,
+        defaultViewport: chromium.defaultViewport || { width: 1920, height: 1080 },
+        executablePath: chromiumPath,
+        headless: true,
         ignoreHTTPSErrors: true,
       });
     } else {
