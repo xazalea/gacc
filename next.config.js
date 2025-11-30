@@ -16,10 +16,8 @@ const nextConfig = {
       config.externals = [
         ...(config.externals || []),
         '@sparticuz/chromium-min',
-        'puppeteer-extra',
-        'puppeteer-extra-plugin-stealth',
-        'clone-deep',
-        'merge-deep',
+        // 'puppeteer-extra',
+        // 'puppeteer-extra-plugin-stealth',
       ];
       config.optimization = { ...config.optimization, minimize: true };
     }
