@@ -49,7 +49,7 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
         executablePath: executablePath,
         headless: chromiumModule.headless,
         ignoreHTTPSErrors: true,
-      });
+      } as any);
     } else {
       const args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'];
       if (proxy) args.push(`--proxy-server=${proxy}`);
@@ -57,7 +57,8 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
         args,
         executablePath: process.env.CHROME_PATH,
         headless: true,
-      });
+        ignoreHTTPSErrors: true,
+      } as any);
     }
 
     const page = await browser.newPage();
