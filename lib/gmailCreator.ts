@@ -12,7 +12,12 @@ export interface GmailAccount {
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccount> {
+export async function createGmailAccount(userInfo: UserInfo, onStatusUpdate?: (status: string) => void): Promise<GmailAccount> {
+  const status = (msg: string) => {
+    console.log(msg);
+    if (onStatusUpdate) onStatusUpdate(msg);
+  };
+
   // Set environment variable in code before importing chromium
   if (process.env.VERCEL === '1' && !process.env.AWS_LAMBDA_JS_RUNTIME) {
     process.env.AWS_LAMBDA_JS_RUNTIME = 'nodejs22.x';
@@ -30,14 +35,16 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
       const useProxy = attempt < MAX_RETRIES;
       const proxy = useProxy ? await getProxy() : undefined;
       
-      console.log(`Attempt ${attempt}/${MAX_RETRIES} (${useProxy ? 'Proxy: ' + proxy : 'Direct Connection'})`);
+      const attemptMsg = `Attempt ${attempt}/${MAX_RETRIES} (${useProxy ? 'Proxy: ' + proxy : 'Direct Connection'})`;
+      status(attemptMsg);
 
       if (useProxy && !proxy) {
-        console.log('No proxy available, skipping to next attempt');
+        status('No proxy available, skipping to next attempt');
         continue;
       }
 
       if (process.env.VERCEL === '1') {
+        status('Launching Chromium (Serverless)...');
         const chromium = await import('@sparticuz/chromium-min');
         const chromiumModule = chromium.default || chromium;
         
@@ -68,6 +75,7 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
           ignoreHTTPSErrors: true,
         } as any);
       } else {
+        status('Launching Chrome (Local)...');
         const args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'];
         if (proxy) args.push(`--proxy-server=${proxy}`);
         browser = await puppeteer.default.launch({
@@ -83,12 +91,15 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
       // Set a realistic User Agent to avoid basic bot detection
       await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
+      status('Navigating to Google Signup...');
       await page.goto('https://accounts.google.com/signup/v2/webcreateaccount?flowName=GlifWebSignIn&flowEntry=SignUp', { waitUntil: 'domcontentloaded', timeout: 30000 });
       
       // Wait for either the new layout or the old one
       try {
+          status('Waiting for first name field...');
           await page.waitForSelector('input[name="firstName"]', { timeout: 15000 });
       } catch (e) {
+          status('First name selector not found, taking screenshot...');
           console.log('First name selector not found, taking screenshot...');
           // Debug: log page content if selector fails
           const content = await page.content();
@@ -96,17 +107,20 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
           throw e;
       }
 
+      status('Entering personal info...');
       await page.type('input[name="firstName"]', userInfo.firstName, { delay: 20 });
       await page.type('input[name="lastName"]', userInfo.lastName, { delay: 20 });
       await page.click('#collectNameNext');
       await delay(1000); // Increased delay after click
       
+      status('Entering username...');
       await page.waitForSelector('input[name="Username"]', { timeout: 15000 });
       await page.type('input[name="Username"]', userInfo.username, { delay: 20 });
       await page.click('#next');
       await delay(1000);
       
       if (!(await page.$('input[name="Passwd"]'))) {
+        status('Username taken, generating suggestion...');
         const newUsername = `${userInfo.firstName.toLowerCase()}.${userInfo.lastName.toLowerCase()}${Math.floor(100000 + Math.random() * 900000)}`;
         await page.click('input[name="Username"]', { clickCount: 3 });
         await page.type('input[name="Username"]', newUsername, { delay: 20 });
@@ -116,12 +130,14 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
         userInfo.email = `${newUsername}@gmail.com`;
       }
       
+      status('Entering password...');
       await page.waitForSelector('input[name="Passwd"]', { timeout: 15000 });
       await page.type('input[name="Passwd"]', userInfo.password, { delay: 20 });
       await page.type('input[name="PasswdAgain"]', userInfo.password, { delay: 20 });
       await page.click('#createpasswordNext');
       await delay(1000);
       
+      status('Entering birthday...');
       const monthSelect = await page.$('select[id="month"]');
       if (monthSelect) await page.select('select[id="month"]', userInfo.birthday.month.toString());
       
@@ -139,11 +155,13 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
       try {
         const skipButtons = await page.$x("//button[contains(text(), 'Skip')] | //button[contains(text(), 'Not now')]");
         if (skipButtons.length > 0) {
+          status('Skipping phone verification...');
           await skipButtons[0].evaluate((el: Node) => (el instanceof HTMLElement && el.click()));
           await delay(500);
         }
       } catch {}
       
+      status('Account created successfully!');
       await page.close();
       await browser.close();
       
@@ -157,6 +175,7 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
       };
 
     } catch (error: any) {
+      status(`Attempt ${attempt} failed: ${error.message}`);
       console.error(`Attempt ${attempt} failed:`, error);
       lastError = error;
       if (browser) {
