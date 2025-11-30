@@ -13,14 +13,18 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
   const puppeteer = await import('puppeteer-core');
   let executablePath: string | undefined;
   let chromiumArgs: string[] = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process'];
+  let headless = true;
+  let defaultViewport = { width: 1280, height: 720 };
   
   if (process.env.VERCEL === '1') {
     // Dynamic import - chromium not bundled
     const chromium = await import('@sparticuz/chromium');
     const chromiumModule = (chromium.default || chromium) as any;
     executablePath = await chromiumModule.executablePath();
-    // Use chromium's args which include all necessary flags for serverless
+    // Use chromium's args which include all necessary flags for serverless (fixes libnss3.so error)
     chromiumArgs = [...chromiumModule.args, ...chromiumArgs];
+    headless = chromiumModule.headless ?? true;
+    defaultViewport = chromiumModule.defaultViewport || defaultViewport;
   } else {
     executablePath = process.env.CHROME_PATH;
   }
@@ -28,12 +32,12 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
   const browser = await puppeteer.default.launch({
     args: chromiumArgs,
     executablePath,
-    headless: true,
+    headless,
     ignoreHTTPSErrors: true,
+    defaultViewport,
   });
 
   const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 720 });
   await page.goto('https://accounts.google.com/signup/v2/webcreateaccount?flowName=GlifWebSignIn&flowEntry=SignUp', { waitUntil: 'domcontentloaded', timeout: 15000 });
   
   await page.waitForSelector('input[name="firstName"]', { timeout: 5000 });
