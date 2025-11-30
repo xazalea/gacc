@@ -18,8 +18,10 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
   if (process.env.VERCEL === '1') {
     const chromium = await import('@sparticuz/chromium');
     const chromiumModule = chromium.default || chromium;
+    
+    // Get chromium config
     const executablePath = await chromiumModule.executablePath();
-    const args = [...chromiumModule.args];
+    const args = chromiumModule.args || [];
     
     // Add proxy if available
     if (proxy) {
@@ -27,10 +29,11 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
     }
     
     browser = await puppeteer.default.launch({
-      args,
-      defaultViewport: chromiumModule.defaultViewport,
-      executablePath,
-      headless: chromiumModule.headless,
+      args: args,
+      defaultViewport: chromiumModule.defaultViewport || { width: 1280, height: 720 },
+      executablePath: executablePath,
+      headless: chromiumModule.headless !== false,
+      ignoreHTTPSErrors: true,
     });
   } else {
     const args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'];
