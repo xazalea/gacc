@@ -1,8 +1,4 @@
 import { UserInfo } from './userGenerator';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-import * as https from 'https';
 
 export interface GmailAccount {
   email: string;
@@ -13,34 +9,18 @@ export interface GmailAccount {
   createdAt: string;
 }
 
-// Download Chromium on-demand to avoid bundling it
-async function downloadChromium(): Promise<string> {
-  const tmpDir = os.tmpdir();
-  const chromiumPath = path.join(tmpDir, 'chromium');
-  
-  if (fs.existsSync(chromiumPath)) {
-    return chromiumPath;
-  }
-  
-  // Use a CDN-hosted minimal Chromium or fallback to @sparticuz/chromium
-  // For now, try to use @sparticuz/chromium but download it on-demand
-  const chromium = await import('@sparticuz/chromium');
-  const chromiumModule = (chromium.default || chromium) as any;
-  const execPath = await chromiumModule.executablePath();
-  
-  // Copy to tmp if needed
-  if (execPath && execPath !== chromiumPath && fs.existsSync(execPath)) {
-    fs.copyFileSync(execPath, chromiumPath);
-    fs.chmodSync(chromiumPath, 0o755);
-    return chromiumPath;
-  }
-  
-  return execPath;
-}
-
 export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccount> {
   const puppeteer = await import('puppeteer-core');
-  const executablePath = process.env.VERCEL === '1' ? await downloadChromium() : process.env.CHROME_PATH;
+  let executablePath: string | undefined;
+  
+  if (process.env.VERCEL === '1') {
+    // Dynamic import - chromium not bundled
+    const chromium = await import('@sparticuz/chromium');
+    const chromiumModule = (chromium.default || chromium) as any;
+    executablePath = await chromiumModule.executablePath();
+  } else {
+    executablePath = process.env.CHROME_PATH;
+  }
   
   const browser = await puppeteer.default.launch({
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process'],
