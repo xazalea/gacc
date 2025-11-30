@@ -143,7 +143,11 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
       // Try to find skip button using XPath and click via evaluate
       const skipButtons = await page.$x("//button[contains(text(), 'Skip')] | //button[contains(text(), 'Not now')] | //button[@jsname='LgbsSe']");
       if (skipButtons.length > 0) {
-        await skipButtons[0].evaluate((el: Element) => (el as HTMLElement).click());
+        await skipButtons[0].evaluate((el: Node) => {
+          if (el instanceof HTMLElement) {
+            el.click();
+          }
+        });
         await page.waitForTimeout(2000);
       }
     } catch (e) {
