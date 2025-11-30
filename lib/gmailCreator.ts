@@ -17,132 +17,151 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
   }
   
   const puppeteer = await import('puppeteer-core');
-  const proxy = await getProxy();
-  let browser: any;
   
-  try {
-    if (process.env.VERCEL === '1') {
-      const chromium = await import('@sparticuz/chromium-min');
-      const chromiumModule = chromium.default || chromium;
-      
-      // Use a specific download URL for the pack if needed, or rely on default behavior
-    // For -min package, we need to provide the pack URL or it will try to download from default location
-    const executablePath = await chromiumModule.executablePath(
-      "https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar"
-    );
-      
-      // Use proper args from chromium module
-      const args = [
-        ...chromiumModule.args,
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--single-process',
-        '--disable-gpu',
-      ];
-      
-      if (proxy) args.push(`--proxy-server=${proxy}`);
-      
-      browser = await puppeteer.default.launch({
-        args: args,
-        defaultViewport: chromiumModule.defaultViewport || { width: 1280, height: 720 },
-        executablePath: executablePath,
-        headless: chromiumModule.headless,
-        ignoreHTTPSErrors: true,
-      } as any);
-    } else {
-      const args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'];
-      if (proxy) args.push(`--proxy-server=${proxy}`);
-      browser = await puppeteer.default.launch({
-        args,
-        executablePath: process.env.CHROME_PATH,
-        headless: true,
-        ignoreHTTPSErrors: true,
-      } as any);
-    }
+  const MAX_RETRIES = 3;
+  let lastError: any;
 
-    const page = await browser.newPage();
-    await page.goto('https://accounts.google.com/signup/v2/webcreateaccount?flowName=GlifWebSignIn&flowEntry=SignUp', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    
-    // Wait for either the new layout or the old one
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    let browser: any = null;
     try {
-        await page.waitForSelector('input[name="firstName"]', { timeout: 15000 });
-    } catch (e) {
-        console.log('First name selector not found, taking screenshot...');
-        // Debug: log page content if selector fails
-        const content = await page.content();
-        console.log('Page content length:', content.length);
-        throw e;
-    }
+      const proxy = await getProxy();
+      console.log(`Attempt ${attempt}/${MAX_RETRIES} using proxy: ${proxy || 'none'}`);
 
-    await page.type('input[name="firstName"]', userInfo.firstName, { delay: 20 });
-    await page.type('input[name="lastName"]', userInfo.lastName, { delay: 20 });
-    await page.click('#collectNameNext');
-    await page.waitForTimeout(300);
-    
-    await page.waitForSelector('input[name="Username"]', { timeout: 5000 });
-    await page.type('input[name="Username"]', userInfo.username, { delay: 20 });
-    await page.click('#next');
-    await page.waitForTimeout(1000);
-    
-    if (!(await page.$('input[name="Passwd"]'))) {
-      const newUsername = `${userInfo.firstName.toLowerCase()}.${userInfo.lastName.toLowerCase()}${Math.floor(100000 + Math.random() * 900000)}`;
-      await page.click('input[name="Username"]', { clickCount: 3 });
-      await page.type('input[name="Username"]', newUsername, { delay: 20 });
+      if (process.env.VERCEL === '1') {
+        const chromium = await import('@sparticuz/chromium-min');
+        const chromiumModule = chromium.default || chromium;
+        
+        // Use a specific download URL for the pack if needed, or rely on default behavior
+        // For -min package, we need to provide the pack URL or it will try to download from default location
+        const executablePath = await chromiumModule.executablePath(
+          "https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar"
+        );
+        
+        // Use proper args from chromium module
+        const args = [
+          ...chromiumModule.args,
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--single-process',
+          '--disable-gpu',
+        ];
+        
+        if (proxy) args.push(`--proxy-server=${proxy}`);
+        
+        browser = await puppeteer.default.launch({
+          args: args,
+          defaultViewport: chromiumModule.defaultViewport || { width: 1280, height: 720 },
+          executablePath: executablePath,
+          headless: chromiumModule.headless,
+          ignoreHTTPSErrors: true,
+        } as any);
+      } else {
+        const args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'];
+        if (proxy) args.push(`--proxy-server=${proxy}`);
+        browser = await puppeteer.default.launch({
+          args,
+          executablePath: process.env.CHROME_PATH,
+          headless: true,
+          ignoreHTTPSErrors: true,
+        } as any);
+      }
+
+      const page = await browser.newPage();
+      
+      // Set a realistic User Agent to avoid basic bot detection
+      await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
+      await page.goto('https://accounts.google.com/signup/v2/webcreateaccount?flowName=GlifWebSignIn&flowEntry=SignUp', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      
+      // Wait for either the new layout or the old one
+      try {
+          await page.waitForSelector('input[name="firstName"]', { timeout: 15000 });
+      } catch (e) {
+          console.log('First name selector not found, taking screenshot...');
+          // Debug: log page content if selector fails
+          const content = await page.content();
+          console.log('Page content length:', content.length);
+          throw e;
+      }
+
+      await page.type('input[name="firstName"]', userInfo.firstName, { delay: 20 });
+      await page.type('input[name="lastName"]', userInfo.lastName, { delay: 20 });
+      await page.click('#collectNameNext');
+      await page.waitForTimeout(300);
+      
+      await page.waitForSelector('input[name="Username"]', { timeout: 5000 });
+      await page.type('input[name="Username"]', userInfo.username, { delay: 20 });
       await page.click('#next');
       await page.waitForTimeout(1000);
-      userInfo.username = newUsername;
-      userInfo.email = `${newUsername}@gmail.com`;
-    }
-    
-    await page.waitForSelector('input[name="Passwd"]', { timeout: 5000 });
-    await page.type('input[name="Passwd"]', userInfo.password, { delay: 20 });
-    await page.type('input[name="PasswdAgain"]', userInfo.password, { delay: 20 });
-    await page.click('#createpasswordNext');
-    await page.waitForTimeout(1000);
-    
-    const monthSelect = await page.$('select[id="month"]');
-    if (monthSelect) await page.select('select[id="month"]', userInfo.birthday.month.toString());
-    
-    await page.waitForSelector('input[id="day"]', { timeout: 5000 });
-    await page.type('input[id="day"]', userInfo.birthday.day.toString(), { delay: 20 });
-    await page.type('input[id="year"]', userInfo.birthday.year.toString(), { delay: 20 });
-    
-    const genderSelect = await page.$('select[id="gender"]');
-    if (genderSelect) await page.select('select[id="gender"]', '1');
-    
-    const nextButton = await page.$('#birthdaygenderNext');
-    if (nextButton) await nextButton.click();
-    await page.waitForTimeout(1000);
-    
-    try {
-      const skipButtons = await page.$x("//button[contains(text(), 'Skip')] | //button[contains(text(), 'Not now')]");
-      if (skipButtons.length > 0) {
-        await skipButtons[0].evaluate((el: Node) => (el instanceof HTMLElement && el.click()));
-        await page.waitForTimeout(500);
+      
+      if (!(await page.$('input[name="Passwd"]'))) {
+        const newUsername = `${userInfo.firstName.toLowerCase()}.${userInfo.lastName.toLowerCase()}${Math.floor(100000 + Math.random() * 900000)}`;
+        await page.click('input[name="Username"]', { clickCount: 3 });
+        await page.type('input[name="Username"]', newUsername, { delay: 20 });
+        await page.click('#next');
+        await page.waitForTimeout(1000);
+        userInfo.username = newUsername;
+        userInfo.email = `${newUsername}@gmail.com`;
       }
-    } catch {}
-    
-    await page.close();
-    await browser.close();
-    
-    return {
-      email: userInfo.email,
-      password: userInfo.password,
-      firstName: userInfo.firstName,
-      lastName: userInfo.lastName,
-      username: userInfo.username,
-      createdAt: new Date().toISOString(),
-    };
-  } catch (error: any) {
-    console.error('Browser automation failed:', error);
-    if (browser) {
+      
+      await page.waitForSelector('input[name="Passwd"]', { timeout: 5000 });
+      await page.type('input[name="Passwd"]', userInfo.password, { delay: 20 });
+      await page.type('input[name="PasswdAgain"]', userInfo.password, { delay: 20 });
+      await page.click('#createpasswordNext');
+      await page.waitForTimeout(1000);
+      
+      const monthSelect = await page.$('select[id="month"]');
+      if (monthSelect) await page.select('select[id="month"]', userInfo.birthday.month.toString());
+      
+      await page.waitForSelector('input[id="day"]', { timeout: 5000 });
+      await page.type('input[id="day"]', userInfo.birthday.day.toString(), { delay: 20 });
+      await page.type('input[id="year"]', userInfo.birthday.year.toString(), { delay: 20 });
+      
+      const genderSelect = await page.$('select[id="gender"]');
+      if (genderSelect) await page.select('select[id="gender"]', '1');
+      
+      const nextButton = await page.$('#birthdaygenderNext');
+      if (nextButton) await nextButton.click();
+      await page.waitForTimeout(1000);
+      
       try {
-        await browser.close();
-      } catch (e) {
-        // Ignore
+        const skipButtons = await page.$x("//button[contains(text(), 'Skip')] | //button[contains(text(), 'Not now')]");
+        if (skipButtons.length > 0) {
+          await skipButtons[0].evaluate((el: Node) => (el instanceof HTMLElement && el.click()));
+          await page.waitForTimeout(500);
+        }
+      } catch {}
+      
+      await page.close();
+      await browser.close();
+      
+      return {
+        email: userInfo.email,
+        password: userInfo.password,
+        firstName: userInfo.firstName,
+        lastName: userInfo.lastName,
+        username: userInfo.username,
+        createdAt: new Date().toISOString(),
+      };
+
+    } catch (error: any) {
+      console.error(`Attempt ${attempt} failed:`, error);
+      lastError = error;
+      if (browser) {
+        try {
+          await browser.close();
+        } catch (e) {
+          // Ignore
+        }
+      }
+      
+      // If we have retries left, continue to next iteration (which will get a new proxy)
+      if (attempt < MAX_RETRIES) {
+        continue;
       }
     }
-    throw error;
   }
+
+  throw lastError || new Error('Failed to create account after multiple attempts');
 }
