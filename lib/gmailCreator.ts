@@ -99,9 +99,9 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
       await page.type('input[name="firstName"]', userInfo.firstName, { delay: 20 });
       await page.type('input[name="lastName"]', userInfo.lastName, { delay: 20 });
       await page.click('#collectNameNext');
-      await delay(300);
+      await delay(1000); // Increased delay after click
       
-      await page.waitForSelector('input[name="Username"]', { timeout: 5000 });
+      await page.waitForSelector('input[name="Username"]', { timeout: 15000 });
       await page.type('input[name="Username"]', userInfo.username, { delay: 20 });
       await page.click('#next');
       await delay(1000);
@@ -116,7 +116,7 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
         userInfo.email = `${newUsername}@gmail.com`;
       }
       
-      await page.waitForSelector('input[name="Passwd"]', { timeout: 5000 });
+      await page.waitForSelector('input[name="Passwd"]', { timeout: 15000 });
       await page.type('input[name="Passwd"]', userInfo.password, { delay: 20 });
       await page.type('input[name="PasswdAgain"]', userInfo.password, { delay: 20 });
       await page.click('#createpasswordNext');
@@ -125,7 +125,7 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
       const monthSelect = await page.$('select[id="month"]');
       if (monthSelect) await page.select('select[id="month"]', userInfo.birthday.month.toString());
       
-      await page.waitForSelector('input[id="day"]', { timeout: 5000 });
+      await page.waitForSelector('input[id="day"]', { timeout: 15000 });
       await page.type('input[id="day"]', userInfo.birthday.day.toString(), { delay: 20 });
       await page.type('input[id="year"]', userInfo.birthday.year.toString(), { delay: 20 });
       
