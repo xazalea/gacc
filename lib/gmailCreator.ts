@@ -10,45 +10,32 @@ export interface GmailAccount {
   createdAt: string;
 }
 
-// Use ScrapingBee free tier or similar - works on Vercel
-async function useBrowserAPI(userInfo: UserInfo): Promise<GmailAccount> {
-  // ScrapingBee free tier: 1000 API calls/month
-  const apiKey = process.env.SCRAPINGBEE_API_KEY || '';
-  const apiUrl = 'https://app.scrapingbee.com/api/v1/';
-  
-  if (!apiKey) {
-    throw new Error(
-      'Browser automation requires SCRAPINGBEE_API_KEY. ' +
-      'Get free API key at https://www.scrapingbee.com/ (1000 free requests/month). ' +
-      'Add it to Vercel environment variables.'
-    );
-  }
-  
-  // For now, throw helpful error - full implementation would require ScrapingBee's browser API
-  throw new Error(
-    'Chromium does not work on Vercel due to missing system libraries. ' +
-    'Please use ScrapingBee or similar browser service API. ' +
-    'Set SCRAPINGBEE_API_KEY environment variable in Vercel dashboard.'
-  );
-}
-
 export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccount> {
   // Set environment variable in code before importing chromium
   if (process.env.VERCEL === '1' && !process.env.AWS_LAMBDA_JS_RUNTIME) {
     process.env.AWS_LAMBDA_JS_RUNTIME = 'nodejs22.x';
   }
   
+  const puppeteer = await import('puppeteer-core');
+  const proxy = await getProxy();
+  let browser: any;
+  
   try {
-    const puppeteer = await import('puppeteer-core');
-    const proxy = await getProxy();
-    let browser: any;
-    
     if (process.env.VERCEL === '1') {
       const chromium = await import('@sparticuz/chromium');
       const chromiumModule = chromium.default || chromium;
       
       const executablePath = await chromiumModule.executablePath();
-      const args = chromiumModule.args || [];
+      
+      // Use proper args from chromium module
+      const args = [
+        ...chromiumModule.args,
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--single-process',
+        '--disable-gpu',
+      ];
       
       if (proxy) args.push(`--proxy-server=${proxy}`);
       
@@ -56,7 +43,7 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
         args: args,
         defaultViewport: chromiumModule.defaultViewport || { width: 1280, height: 720 },
         executablePath: executablePath,
-        headless: chromiumModule.headless !== false,
+        headless: chromiumModule.headless,
         ignoreHTTPSErrors: true,
       });
     } else {
@@ -133,9 +120,13 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
       createdAt: new Date().toISOString(),
     };
   } catch (error: any) {
-    // If Chromium fails, try browser API fallback
-    if (error.message?.includes('libnss3.so') || error.message?.includes('Failed to launch')) {
-      return await useBrowserAPI(userInfo);
+    console.error('Browser automation failed:', error);
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (e) {
+        // Ignore
+      }
     }
     throw error;
   }
