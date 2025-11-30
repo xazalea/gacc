@@ -2,6 +2,9 @@
   "name": "gmail-account-creator",
   "version": "1.0.0",
   "description": "Automated Gmail account creation API for Vercel",
+  "engines": {
+    "node": "18.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
