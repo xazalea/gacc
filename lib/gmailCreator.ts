@@ -1,4 +1,5 @@
 import { UserInfo } from './userGenerator';
+import { getProxy } from './proxyManager';
 
 export interface GmailAccount {
   email: string;
@@ -12,25 +13,30 @@ export interface GmailAccount {
 export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccount> {
   const puppeteer = await import('puppeteer-core');
   let browser: any;
+  const proxy = await getProxy();
   
   if (process.env.VERCEL === '1') {
-    // Use @sparticuz/chromium - must use exact pattern
     const chromium = await import('@sparticuz/chromium');
-    // chromium is the default export, not chromium.default
     const chromiumModule = chromium.default || chromium;
-    
-    // Get executable path first
     const executablePath = await chromiumModule.executablePath();
+    const args = [...chromiumModule.args];
+    
+    // Add proxy if available
+    if (proxy) {
+      args.push(`--proxy-server=${proxy}`);
+    }
     
     browser = await puppeteer.default.launch({
-      args: chromiumModule.args,
+      args,
       defaultViewport: chromiumModule.defaultViewport,
-      executablePath: executablePath,
+      executablePath,
       headless: chromiumModule.headless,
     });
   } else {
+    const args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'];
+    if (proxy) args.push(`--proxy-server=${proxy}`);
     browser = await puppeteer.default.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      args,
       executablePath: process.env.CHROME_PATH,
       headless: true,
     });
