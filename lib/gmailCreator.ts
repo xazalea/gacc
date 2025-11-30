@@ -12,20 +12,24 @@ export interface GmailAccount {
 export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccount> {
   const puppeteer = await import('puppeteer-core');
   let executablePath: string | undefined;
+  let chromiumArgs: string[] = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process'];
   
   if (process.env.VERCEL === '1') {
     // Dynamic import - chromium not bundled
     const chromium = await import('@sparticuz/chromium');
     const chromiumModule = (chromium.default || chromium) as any;
     executablePath = await chromiumModule.executablePath();
+    // Use chromium's args which include all necessary flags for serverless
+    chromiumArgs = [...chromiumModule.args, ...chromiumArgs];
   } else {
     executablePath = process.env.CHROME_PATH;
   }
   
   const browser = await puppeteer.default.launch({
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process'],
+    args: chromiumArgs,
     executablePath,
     headless: true,
+    ignoreHTTPSErrors: true,
   });
 
   const page = await browser.newPage();
