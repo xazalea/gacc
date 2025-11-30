@@ -11,31 +11,27 @@ export interface GmailAccount {
 
 export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccount> {
   const puppeteer = await import('puppeteer-core');
-  let executablePath: string | undefined;
-  let chromiumArgs: string[] = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process'];
-  let headless = true;
-  let defaultViewport = { width: 1280, height: 720 };
+  let browser: any;
   
   if (process.env.VERCEL === '1') {
-    // Dynamic import - chromium not bundled
+    // Use @sparticuz/chromium with exact pattern it expects
     const chromium = await import('@sparticuz/chromium');
-    const chromiumModule = (chromium.default || chromium) as any;
-    executablePath = await chromiumModule.executablePath();
-    // Use chromium's args which include all necessary flags for serverless (fixes libnss3.so error)
-    chromiumArgs = [...chromiumModule.args, ...chromiumArgs];
-    headless = chromiumModule.headless ?? true;
-    defaultViewport = chromiumModule.defaultViewport || defaultViewport;
+    const chromiumModule = chromium.default || chromium;
+    
+    browser = await puppeteer.default.launch({
+      args: chromiumModule.args,
+      defaultViewport: chromiumModule.defaultViewport,
+      executablePath: await chromiumModule.executablePath(),
+      headless: chromiumModule.headless,
+      ignoreHTTPSErrors: true,
+    });
   } else {
-    executablePath = process.env.CHROME_PATH;
+    browser = await puppeteer.default.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      executablePath: process.env.CHROME_PATH,
+      headless: true,
+    });
   }
-  
-  const browser = await puppeteer.default.launch({
-    args: chromiumArgs,
-    executablePath,
-    headless,
-    ignoreHTTPSErrors: true,
-    defaultViewport,
-  });
 
   const page = await browser.newPage();
   await page.goto('https://accounts.google.com/signup/v2/webcreateaccount?flowName=GlifWebSignIn&flowEntry=SignUp', { waitUntil: 'domcontentloaded', timeout: 15000 });
