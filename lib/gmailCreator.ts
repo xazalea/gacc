@@ -2,9 +2,6 @@ import puppeteer, { Browser, Page } from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 import { UserInfo } from './userGenerator';
 
-// Configure Chromium for serverless
-chromium.setGraphicsMode(false);
-
 export interface GmailAccount {
   email: string;
   password: string;
