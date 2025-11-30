@@ -23,7 +23,16 @@ export async function createGmailAccount(userInfo: UserInfo, onStatusUpdate?: (s
     process.env.AWS_LAMBDA_JS_RUNTIME = 'nodejs22.x';
   }
   
-  const puppeteer = await import('puppeteer-core');
+  const puppeteerCore = await import('puppeteer-core');
+  const puppeteerExtra = await import('puppeteer-extra');
+  const StealthPlugin = await import('puppeteer-extra-plugin-stealth');
+
+  const puppeteer = puppeteerExtra.default || puppeteerExtra;
+  const stealth = StealthPlugin.default || StealthPlugin;
+  
+  // Configure puppeteer-extra to use puppeteer-core
+  // @ts-ignore
+  puppeteer.use(stealth());
   
   const MAX_RETRIES = 4; // 3 proxy attempts + 1 direct fallback
   let lastError: any;
@@ -67,7 +76,7 @@ export async function createGmailAccount(userInfo: UserInfo, onStatusUpdate?: (s
         
         if (proxy) args.push(`--proxy-server=${proxy}`);
         
-        browser = await puppeteer.default.launch({
+        browser = await puppeteer.launch({
           args: args,
           defaultViewport: chromiumModule.defaultViewport || { width: 1280, height: 720 },
           executablePath: executablePath,
@@ -78,7 +87,7 @@ export async function createGmailAccount(userInfo: UserInfo, onStatusUpdate?: (s
         status('Launching Chrome (Local)...');
         const args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'];
         if (proxy) args.push(`--proxy-server=${proxy}`);
-        browser = await puppeteer.default.launch({
+        browser = await puppeteer.launch({
           args,
           executablePath: process.env.CHROME_PATH,
           headless: true,
