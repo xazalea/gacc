@@ -1,4 +1,5 @@
 import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 import { UserInfo } from './userGenerator';
 
 export interface GmailAccount {
@@ -11,48 +12,69 @@ export interface GmailAccount {
 }
 
 /**
- * Creates a Gmail account using Lightpanda browser
- * Lightpanda is a lightweight headless browser designed for serverless environments
+ * Creates a Gmail account using Puppeteer with @sparticuz/chromium
+ * This version is optimized for Vercel serverless functions
  */
 export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccount> {
   let browser: any = null;
 
   try {
-    // Lightpanda can be used in two ways:
-    // 1. Self-hosted: Run Lightpanda server and connect via WebSocket
-    // 2. Cloud service: Use Lightpanda's cloud service (if available)
-    
-    const lightpandaUrl = process.env.LIGHTPANDA_URL || 'ws://127.0.0.1:9222';
     const isProduction = process.env.VERCEL === '1';
     
     if (isProduction) {
-      // For Vercel, use Lightpanda cloud service or self-hosted instance
-      // You can deploy Lightpanda on Railway, Render, or similar
-      const cloudUrl = process.env.LIGHTPANDA_CLOUD_URL;
+      // For Vercel, use @sparticuz/chromium with optimized settings
+      // This package includes a Chromium binary with all dependencies bundled
+      const executablePath = await chromium.executablePath();
       
-      if (cloudUrl) {
-        // Connect to cloud-hosted Lightpanda instance
-        browser = await puppeteer.connect({
-          browserWSEndpoint: cloudUrl,
-        });
-      } else {
-        // Fallback: Try to use a public Lightpanda instance or error
-        throw new Error(
-          'LIGHTPANDA_CLOUD_URL environment variable is required for Vercel deployment. ' +
-          'Deploy Lightpanda on Railway/Render or use a Lightpanda cloud service. ' +
-          'See: https://github.com/lightpanda-io/browser'
-        );
-      }
+      browser = await puppeteer.launch({
+        args: [
+          ...chromium.args,
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--disable-software-rasterizer',
+          '--disable-extensions',
+          '--single-process',
+          '--disable-background-networking',
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-breakpad',
+          '--disable-client-side-phishing-detection',
+          '--disable-component-update',
+          '--disable-default-apps',
+          '--disable-features=TranslateUI',
+          '--disable-hang-monitor',
+          '--disable-ipc-flooding-protection',
+          '--disable-popup-blocking',
+          '--disable-prompt-on-repost',
+          '--disable-renderer-backgrounding',
+          '--disable-sync',
+          '--disable-translate',
+          '--metrics-recording-only',
+          '--no-first-run',
+          '--safebrowsing-disable-auto-update',
+          '--enable-automation',
+          '--password-store=basic',
+          '--use-mock-keychain',
+          '--disable-web-security',
+          '--disable-features=IsolateOrigins,site-per-process',
+        ],
+        defaultViewport: chromium.defaultViewport || { width: 1920, height: 1080 },
+        executablePath,
+        headless: chromium.headless,
+        ignoreHTTPSErrors: true,
+      });
     } else {
-      // For local development, connect to local Lightpanda instance
-      // Make sure Lightpanda is running: ./lightpanda serve --host 127.0.0.1 --port 9222
-      browser = await puppeteer.connect({
-        browserWSEndpoint: lightpandaUrl,
+      // For local development
+      browser = await puppeteer.launch({
+        headless: process.env.HEADLESS !== 'false',
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+        executablePath: process.env.CHROME_PATH || undefined,
       });
     }
 
-    const context = await browser.createBrowserContext();
-    const page = await context.newPage();
+    const page = await browser.newPage();
     
     // Set viewport and user agent
     await page.setViewport({ width: 1920, height: 1080 });
@@ -167,8 +189,7 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
     
     // Clean up
     await page.close();
-    await context.close();
-    await browser.disconnect();
+    await browser.close();
     
     // If phone verification is required, we'll return what we have
     // In a real scenario, you'd integrate with SMS services like sms-activate.org
@@ -197,9 +218,9 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
     console.error('Error creating Gmail account:', error);
     if (browser) {
       try {
-        await browser.disconnect();
+        await browser.close();
       } catch (e) {
-        // Ignore disconnect errors
+        // Ignore cleanup errors
       }
     }
     throw error;

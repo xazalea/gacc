@@ -91,39 +91,26 @@ The API endpoint is available at:
 
 The project uses:
 - `puppeteer-core` for browser automation
-- **Lightpanda** browser - a lightweight headless browser designed for serverless
+- `@sparticuz/chromium` - a Chromium binary optimized for serverless (AWS Lambda/Vercel)
 - Next.js API routes for the backend
 
-**Required Setup for Vercel:**
+**No External Services Required!**
 
-1. **Deploy Lightpanda Browser Service**:
-   
-   Lightpanda is a lightweight headless browser that works perfectly on serverless platforms. You need to deploy it as a separate service:
-   
-   **Option A: Deploy on Railway/Render (Recommended)**
-   - Create a new service on Railway or Render
-   - Use the Lightpanda Docker image or build from source
-   - Expose the WebSocket endpoint (default port 9222)
-   - Add the WebSocket URL to Vercel environment variables:
-     - `LIGHTPANDA_CLOUD_URL`: `wss://your-lightpanda-instance.railway.app` (or your Render URL)
-   
-   **Option B: Use Lightpanda Cloud Service** (if available)
-   - Check https://lightpanda.io for cloud service availability
-   - Add the WebSocket URL to `LIGHTPANDA_CLOUD_URL`
-   
-   **Option C: Local Development**
-   - Download Lightpanda from https://github.com/lightpanda-io/browser
-   - Run: `./lightpanda serve --host 127.0.0.1 --port 9222`
-   - The code will automatically connect to `ws://127.0.0.1:9222`
+This setup uses `@sparticuz/chromium` which includes a pre-compiled Chromium binary with all dependencies bundled. It's designed specifically for serverless environments like Vercel.
 
-2. **Why Lightpanda?**
-   - Much lighter than Chromium (designed for serverless)
-   - Lower memory usage
-   - Faster startup times
-   - Perfect for Vercel's serverless functions
-   - Compatible with Puppeteer via CDP
+**Important Notes:**
 
-**Note**: For Vercel Pro plan, set `maxDuration` to 60 seconds in the API route. For Hobby plan, the limit is 10 seconds which may not be sufficient.
+1. **Function Size Limit**: The Chromium binary is large (~50MB). Vercel has a 50MB limit for serverless functions on the Hobby plan. You may need to:
+   - Upgrade to Vercel Pro (250MB limit)
+   - Or use Vercel's Edge Functions (different approach)
+
+2. **Execution Time**: 
+   - Vercel Hobby: 10 seconds (may not be enough)
+   - Vercel Pro: 60 seconds (recommended)
+
+3. **Memory**: Ensure your Vercel plan has sufficient memory (Pro plan recommended)
+
+**Note**: If you encounter size limit issues, consider using Vercel's Edge Runtime or splitting the function, though this may require architectural changes.
 
 ## Project Structure
 
