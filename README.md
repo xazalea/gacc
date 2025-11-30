@@ -90,27 +90,29 @@ The API endpoint is available at:
 ### Vercel Configuration
 
 The project uses:
-- `puppeteer-core` for browser automation
-- `@sparticuz/chromium` - a Chromium binary optimized for serverless (AWS Lambda/Vercel)
+- `puppeteer-core` for browser automation (dynamic import - not bundled)
+- `@sparticuz/chromium-min` - a minimal Chromium binary optimized for serverless (<30MB)
 - Next.js API routes for the backend
 
 **No External Services Required!**
 
-This setup uses `@sparticuz/chromium` which includes a pre-compiled Chromium binary with all dependencies bundled. It's designed specifically for serverless environments like Vercel.
+This setup uses `@sparticuz/chromium-min` which is a minimal Chromium build designed to stay under Vercel's size limits. All dependencies are loaded dynamically at runtime to minimize bundle size.
+
+**Size Optimizations:**
+
+1. **Dynamic Imports**: `puppeteer-core` and `chromium-min` are loaded only when needed
+2. **Minimal Chromium Build**: Using `chromium-min` instead of full Chromium (~20-25MB vs ~50MB)
+3. **Webpack Externals**: Chromium is excluded from bundling
+4. **Minimal Args**: Only essential Chromium flags are used
+5. **Optimized Timeouts**: Reduced delays and timeouts throughout
 
 **Important Notes:**
 
-1. **Function Size Limit**: The Chromium binary is large (~50MB). Vercel has a 50MB limit for serverless functions on the Hobby plan. You may need to:
-   - Upgrade to Vercel Pro (250MB limit)
-   - Or use Vercel's Edge Functions (different approach)
-
+1. **Function Size**: Should now be under 30MB with `chromium-min`
 2. **Execution Time**: 
-   - Vercel Hobby: 10 seconds (may not be enough)
+   - Vercel Hobby: 10 seconds (may not be enough for full flow)
    - Vercel Pro: 60 seconds (recommended)
-
-3. **Memory**: Ensure your Vercel plan has sufficient memory (Pro plan recommended)
-
-**Note**: If you encounter size limit issues, consider using Vercel's Edge Runtime or splitting the function, though this may require architectural changes.
+3. **Memory**: Set to 1024MB in `vercel.json` for optimal performance
 
 ## Project Structure
 
