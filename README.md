@@ -90,19 +90,38 @@ The API endpoint is available at:
 ### Vercel Configuration
 
 The project uses:
-- `playwright-core` for browser automation (with Browserless.io service)
+- `puppeteer-core` for browser automation
+- **Lightpanda** browser - a lightweight headless browser designed for serverless
 - Next.js API routes for the backend
 
 **Required Setup for Vercel:**
 
-1. **Get a Browserless.io API Key** (Free tier available):
-   - Sign up at https://www.browserless.io/
-   - Get your API token from the dashboard
-   - Add it to Vercel environment variables:
-     - `BROWSERLESS_URL`: `https://chrome.browserless.io` (or your self-hosted instance)
-     - `BROWSERLESS_TOKEN`: Your API token
+1. **Deploy Lightpanda Browser Service**:
+   
+   Lightpanda is a lightweight headless browser that works perfectly on serverless platforms. You need to deploy it as a separate service:
+   
+   **Option A: Deploy on Railway/Render (Recommended)**
+   - Create a new service on Railway or Render
+   - Use the Lightpanda Docker image or build from source
+   - Expose the WebSocket endpoint (default port 9222)
+   - Add the WebSocket URL to Vercel environment variables:
+     - `LIGHTPANDA_CLOUD_URL`: `wss://your-lightpanda-instance.railway.app` (or your Render URL)
+   
+   **Option B: Use Lightpanda Cloud Service** (if available)
+   - Check https://lightpanda.io for cloud service availability
+   - Add the WebSocket URL to `LIGHTPANDA_CLOUD_URL`
+   
+   **Option C: Local Development**
+   - Download Lightpanda from https://github.com/lightpanda-io/browser
+   - Run: `./lightpanda serve --host 127.0.0.1 --port 9222`
+   - The code will automatically connect to `ws://127.0.0.1:9222`
 
-2. **Alternative**: Self-host Browserless.io on Railway, Render, or similar platform
+2. **Why Lightpanda?**
+   - Much lighter than Chromium (designed for serverless)
+   - Lower memory usage
+   - Faster startup times
+   - Perfect for Vercel's serverless functions
+   - Compatible with Puppeteer via CDP
 
 **Note**: For Vercel Pro plan, set `maxDuration` to 60 seconds in the API route. For Hobby plan, the limit is 10 seconds which may not be sufficient.
 

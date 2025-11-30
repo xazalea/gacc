@@ -1,3 +1,4 @@
+import puppeteer from 'puppeteer-core';
 import { UserInfo } from './userGenerator';
 
 export interface GmailAccount {
@@ -10,213 +11,169 @@ export interface GmailAccount {
 }
 
 /**
- * Creates a Gmail account using Browserless.io or similar browser service
- * This approach works reliably on Vercel by offloading browser automation
+ * Creates a Gmail account using Lightpanda browser
+ * Lightpanda is a lightweight headless browser designed for serverless environments
  */
 export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccount> {
-  // Use Browserless.io free tier or self-hosted instance
-  // You can get a free API key at https://www.browserless.io/
-  // Or use your own Browserless instance
-  const browserlessUrl = process.env.BROWSERLESS_URL || 'https://chrome.browserless.io';
-  const browserlessToken = process.env.BROWSERLESS_TOKEN || '';
-  
+  let browser: any = null;
+
   try {
-    // Create a script that will run in the browser
-    const script = `
-      (async () => {
-        const page = await this.newPage();
-        await page.setViewport({ width: 1920, height: 1080 });
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-        
-        await page.goto('https://accounts.google.com/signup/v2/webcreateaccount?flowName=GlifWebSignIn&flowEntry=SignUp', {
-          waitUntil: 'networkidle2',
-          timeout: 30000,
-        });
-        
-        await page.waitForSelector('input[name="firstName"]', { timeout: 10000 });
-        await page.type('input[name="firstName"]', '${userInfo.firstName}', { delay: 50 });
-        await page.type('input[name="lastName"]', '${userInfo.lastName}', { delay: 50 });
-        await page.click('#collectNameNext');
-        
-        await page.waitForSelector('input[name="Username"]', { timeout: 10000 });
-        await page.type('input[name="Username"]', '${userInfo.username}', { delay: 50 });
-        await page.click('#next');
-        await page.waitForTimeout(2000);
-        
-        let username = '${userInfo.username}';
-        const passwordField = await page.$('input[name="Passwd"]');
-        if (!passwordField) {
-          username = '${userInfo.firstName.toLowerCase()}.${userInfo.lastName.toLowerCase()}' + Math.floor(100000 + Math.random() * 900000);
-          await page.click('input[name="Username"]', { clickCount: 3 });
-          await page.type('input[name="Username"]', username, { delay: 50 });
-          await page.click('#next');
-          await page.waitForTimeout(2000);
-        }
-        
-        await page.waitForSelector('input[name="Passwd"]', { timeout: 10000 });
-        await page.type('input[name="Passwd"]', '${userInfo.password}', { delay: 50 });
-        await page.type('input[name="PasswdAgain"]', '${userInfo.password}', { delay: 50 });
-        await page.click('#createpasswordNext');
-        await page.waitForTimeout(2000);
-        
-        const monthSelect = await page.$('select[id="month"]');
-        if (monthSelect) {
-          await page.select('select[id="month"]', '${userInfo.birthday.month}');
-        }
-        
-        await page.waitForSelector('input[id="day"]', { timeout: 10000 });
-        await page.type('input[id="day"]', '${userInfo.birthday.day}', { delay: 50 });
-        await page.type('input[id="year"]', '${userInfo.birthday.year}', { delay: 50 });
-        
-        const genderSelect = await page.$('select[id="gender"]');
-        if (genderSelect) {
-          await page.select('select[id="gender"]', '1');
-        }
-        
-        const nextButton = await page.$('#birthdaygenderNext');
-        if (nextButton) {
-          await nextButton.click();
-        }
-        
-        await page.waitForTimeout(2000);
-        
-        const skipButtons = await page.$x("//button[contains(text(), 'Skip')] | //button[contains(text(), 'Not now')]");
-        if (skipButtons.length > 0) {
-          await skipButtons[0].evaluate(el => el.click());
-          await page.waitForTimeout(2000);
-        }
-        
-        const currentUrl = page.url();
-        
-        return {
-          email: username + '@gmail.com',
-          password: '${userInfo.password}',
-          firstName: '${userInfo.firstName}',
-          lastName: '${userInfo.lastName}',
-          username: username,
-          createdAt: new Date().toISOString(),
-          needsVerification: currentUrl.includes('challenge') || currentUrl.includes('phone')
-        };
-      })();
-    `;
-
-    // If browserless token is provided, use Browserless.io
-    if (browserlessToken) {
-      const response = await fetch(`${browserlessUrl}/function?token=${browserlessToken}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          code: script,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Browserless API error: ${response.statusText}`);
-      }
-
-      const result = await response.json();
+    // Lightpanda can be used in two ways:
+    // 1. Self-hosted: Run Lightpanda server and connect via WebSocket
+    // 2. Cloud service: Use Lightpanda's cloud service (if available)
+    
+    const lightpandaUrl = process.env.LIGHTPANDA_URL || 'ws://127.0.0.1:9222';
+    const isProduction = process.env.VERCEL === '1';
+    
+    if (isProduction) {
+      // For Vercel, use Lightpanda cloud service or self-hosted instance
+      // You can deploy Lightpanda on Railway, Render, or similar
+      const cloudUrl = process.env.LIGHTPANDA_CLOUD_URL;
       
-      return {
-        email: result.email || `${userInfo.username}@gmail.com`,
-        password: userInfo.password,
-        firstName: userInfo.firstName,
-        lastName: userInfo.lastName,
-        username: result.username || userInfo.username,
-        createdAt: new Date().toISOString(),
-      };
+      if (cloudUrl) {
+        // Connect to cloud-hosted Lightpanda instance
+        browser = await puppeteer.connect({
+          browserWSEndpoint: cloudUrl,
+        });
+      } else {
+        // Fallback: Try to use a public Lightpanda instance or error
+        throw new Error(
+          'LIGHTPANDA_CLOUD_URL environment variable is required for Vercel deployment. ' +
+          'Deploy Lightpanda on Railway/Render or use a Lightpanda cloud service. ' +
+          'See: https://github.com/lightpanda-io/browser'
+        );
+      }
+    } else {
+      // For local development, connect to local Lightpanda instance
+      // Make sure Lightpanda is running: ./lightpanda serve --host 127.0.0.1 --port 9222
+      browser = await puppeteer.connect({
+        browserWSEndpoint: lightpandaUrl,
+      });
     }
 
-    // Fallback: For local development or if no browser service is configured
-    // This will only work locally with Playwright installed
-    try {
-      const { chromium } = await import('playwright-core');
-      
-      // Try to find Chromium in common locations
-      let executablePath: string | undefined;
-      
-      // For local dev, try to use system browser
-      const browser = await chromium.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      });
-      
-      const context = await browser.newContext({
-        viewport: { width: 1920, height: 1080 },
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      });
-      
-      const page = await context.newPage();
-      
-      await page.goto('https://accounts.google.com/signup/v2/webcreateaccount?flowName=GlifWebSignIn&flowEntry=SignUp', {
-        waitUntil: 'networkidle',
-        timeout: 30000,
-      });
-      
-      await page.waitForSelector('input[name="firstName"]', { timeout: 10000 });
-      await page.fill('input[name="firstName"]', userInfo.firstName);
-      await page.fill('input[name="lastName"]', userInfo.lastName);
-      await page.click('#collectNameNext');
-      await page.waitForTimeout(1000);
-      
-      await page.waitForSelector('input[name="Username"]', { timeout: 10000 });
-      await page.fill('input[name="Username"]', userInfo.username);
+    const context = await browser.createBrowserContext();
+    const page = await context.newPage();
+    
+    // Set viewport and user agent
+    await page.setViewport({ width: 1920, height: 1080 });
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    );
+
+    // Navigate to Gmail signup
+    await page.goto('https://accounts.google.com/signup/v2/webcreateaccount?flowName=GlifWebSignIn&flowEntry=SignUp', {
+      waitUntil: 'networkidle2',
+      timeout: 30000,
+    });
+
+    // Wait for the form to load
+    await page.waitForSelector('input[name="firstName"]', { timeout: 10000 });
+
+    // Fill in first name
+    await page.type('input[name="firstName"]', userInfo.firstName, { delay: 50 });
+
+    // Fill in last name
+    await page.type('input[name="lastName"]', userInfo.lastName, { delay: 50 });
+
+    // Click next button
+    await page.click('#collectNameNext');
+    await page.waitForTimeout(1000);
+
+    // Wait for username/password page
+    await page.waitForSelector('input[name="Username"]', { timeout: 10000 });
+
+    // Fill in username
+    await page.type('input[name="Username"]', userInfo.username, { delay: 50 });
+
+    // Click next to check username availability
+    await page.click('#next');
+
+    // Wait a bit for username validation
+    await page.waitForTimeout(2000);
+
+    // Check if username is available (look for password field or error message)
+    const passwordField = await page.$('input[name="Passwd"]');
+    if (!passwordField) {
+      // Username might be taken, try with different digits
+      const newUsername = `${userInfo.firstName.toLowerCase()}.${userInfo.lastName.toLowerCase()}${Math.floor(100000 + Math.random() * 900000)}`;
+      await page.click('input[name="Username"]', { clickCount: 3 });
+      await page.type('input[name="Username"]', newUsername, { delay: 50 });
       await page.click('#next');
       await page.waitForTimeout(2000);
-      
-      const passwordField = page.locator('input[name="Passwd"]').first();
-      const isPasswordVisible = await passwordField.isVisible().catch(() => false);
-      
-      if (!isPasswordVisible) {
-        const newUsername = `${userInfo.firstName.toLowerCase()}.${userInfo.lastName.toLowerCase()}${Math.floor(100000 + Math.random() * 900000)}`;
-        await page.fill('input[name="Username"]', newUsername);
-        await page.click('#next');
+      userInfo.username = newUsername;
+      userInfo.email = `${newUsername}@gmail.com`;
+    }
+
+    // Wait for password field
+    await page.waitForSelector('input[name="Passwd"]', { timeout: 10000 });
+
+    // Fill in password
+    await page.type('input[name="Passwd"]', userInfo.password, { delay: 50 });
+
+    // Confirm password
+    await page.type('input[name="PasswdAgain"]', userInfo.password, { delay: 50 });
+
+    // Click next
+    await page.click('#createpasswordNext');
+    await page.waitForTimeout(2000);
+
+    // Fill in birthday - month
+    const monthSelect = await page.$('select[id="month"]');
+    if (monthSelect) {
+      await page.select('select[id="month"]', userInfo.birthday.month.toString());
+    }
+
+    // Fill in day
+    await page.waitForSelector('input[id="day"]', { timeout: 10000 });
+    await page.type('input[id="day"]', userInfo.birthday.day.toString(), { delay: 50 });
+
+    // Fill in year
+    await page.type('input[id="year"]', userInfo.birthday.year.toString(), { delay: 50 });
+
+    // Select gender (optional, but helps avoid verification)
+    const genderSelect = await page.$('select[id="gender"]');
+    if (genderSelect) {
+      await page.select('select[id="gender"]', '1'); // Male
+    }
+
+    // Click next
+    const nextButton = await page.$('#birthdaygenderNext');
+    if (nextButton) {
+      await nextButton.click();
+    }
+
+    // Wait for phone verification page
+    await page.waitForTimeout(2000);
+
+    // Skip phone verification if possible
+    try {
+      // Try to find skip button using XPath and click via evaluate
+      const skipButtons = await page.$x("//button[contains(text(), 'Skip')] | //button[contains(text(), 'Not now')] | //button[@jsname='LgbsSe']");
+      if (skipButtons.length > 0) {
+        await skipButtons[0].evaluate((el: Node) => {
+          if (el instanceof HTMLElement) {
+            el.click();
+          }
+        });
         await page.waitForTimeout(2000);
-        userInfo.username = newUsername;
-        userInfo.email = `${newUsername}@gmail.com`;
       }
-      
-      await page.waitForSelector('input[name="Passwd"]', { timeout: 10000 });
-      await page.fill('input[name="Passwd"]', userInfo.password);
-      await page.fill('input[name="PasswdAgain"]', userInfo.password);
-      await page.click('#createpasswordNext');
-      await page.waitForTimeout(2000);
-      
-      const monthSelect = page.locator('select[id="month"]');
-      if (await monthSelect.isVisible().catch(() => false)) {
-        await monthSelect.selectOption(userInfo.birthday.month.toString());
-      }
-      
-      await page.waitForSelector('input[id="day"]', { timeout: 10000 });
-      await page.fill('input[id="day"]', userInfo.birthday.day.toString());
-      await page.fill('input[id="year"]', userInfo.birthday.year.toString());
-      
-      const genderSelect = page.locator('select[id="gender"]');
-      if (await genderSelect.isVisible().catch(() => false)) {
-        await genderSelect.selectOption('1');
-      }
-      
-      const nextButton = page.locator('#birthdaygenderNext');
-      if (await nextButton.isVisible().catch(() => false)) {
-        await nextButton.click();
-      }
-      
-      await page.waitForTimeout(2000);
-      
-      try {
-        const skipButton = page.locator('button:has-text("Skip"), button:has-text("Not now")').first();
-        if (await skipButton.isVisible().catch(() => false)) {
-          await skipButton.click();
-          await page.waitForTimeout(2000);
-        }
-      } catch (e) {
-        // Skip button not found
-      }
-      
-      const currentUrl = page.url();
-      await browser.close();
-      
+    } catch (e) {
+      // Skip button not found, continue
+      console.log('Skip button not found, continuing...');
+    }
+
+    // Check if we're on the welcome page or if phone verification is required
+    const currentUrl = page.url();
+    
+    // Clean up
+    await page.close();
+    await context.close();
+    await browser.disconnect();
+    
+    // If phone verification is required, we'll return what we have
+    // In a real scenario, you'd integrate with SMS services like sms-activate.org
+    if (currentUrl.includes('challenge') || currentUrl.includes('phone')) {
+      // Account created but needs phone verification
       return {
         email: userInfo.email,
         password: userInfo.password,
@@ -225,18 +182,26 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
         username: userInfo.username,
         createdAt: new Date().toISOString(),
       };
-      
-    } catch (playwrightError) {
-      // If Playwright fails, throw a helpful error
-      throw new Error(
-        'Browser automation failed. Please set BROWSERLESS_URL and BROWSERLESS_TOKEN environment variables ' +
-        'to use Browserless.io service, or install Playwright locally for development. ' +
-        `Error: ${playwrightError instanceof Error ? playwrightError.message : 'Unknown error'}`
-      );
     }
-    
+
+    return {
+      email: userInfo.email,
+      password: userInfo.password,
+      firstName: userInfo.firstName,
+      lastName: userInfo.lastName,
+      username: userInfo.username,
+      createdAt: new Date().toISOString(),
+    };
+
   } catch (error) {
     console.error('Error creating Gmail account:', error);
+    if (browser) {
+      try {
+        await browser.disconnect();
+      } catch (e) {
+        // Ignore disconnect errors
+      }
+    }
     throw error;
   }
 }
