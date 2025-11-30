@@ -1,18 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
+    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium-min'],
   },
   webpack: (config, { isServer }) => {
     if (isServer) {
-      // Exclude chromium from webpack bundling to reduce bundle size
+      // Exclude chromium-min from webpack bundling to reduce bundle size
       // Chromium will be loaded at runtime
       config.externals = [
         ...(config.externals || []), 
-        '@sparticuz/chromium',
-        // Also exclude fs and path to reduce size
-        'fs',
-        'path',
+        '@sparticuz/chromium-min',
       ];
       
       // Minimize bundle size
