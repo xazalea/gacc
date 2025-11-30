@@ -10,6 +10,8 @@ export interface GmailAccount {
   createdAt: string;
 }
 
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccount> {
   // Set environment variable in code before importing chromium
   if (process.env.VERCEL === '1' && !process.env.AWS_LAMBDA_JS_RUNTIME) {
@@ -97,19 +99,19 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
       await page.type('input[name="firstName"]', userInfo.firstName, { delay: 20 });
       await page.type('input[name="lastName"]', userInfo.lastName, { delay: 20 });
       await page.click('#collectNameNext');
-      await page.waitForTimeout(300);
+      await delay(300);
       
       await page.waitForSelector('input[name="Username"]', { timeout: 5000 });
       await page.type('input[name="Username"]', userInfo.username, { delay: 20 });
       await page.click('#next');
-      await page.waitForTimeout(1000);
+      await delay(1000);
       
       if (!(await page.$('input[name="Passwd"]'))) {
         const newUsername = `${userInfo.firstName.toLowerCase()}.${userInfo.lastName.toLowerCase()}${Math.floor(100000 + Math.random() * 900000)}`;
         await page.click('input[name="Username"]', { clickCount: 3 });
         await page.type('input[name="Username"]', newUsername, { delay: 20 });
         await page.click('#next');
-        await page.waitForTimeout(1000);
+        await delay(1000);
         userInfo.username = newUsername;
         userInfo.email = `${newUsername}@gmail.com`;
       }
@@ -118,7 +120,7 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
       await page.type('input[name="Passwd"]', userInfo.password, { delay: 20 });
       await page.type('input[name="PasswdAgain"]', userInfo.password, { delay: 20 });
       await page.click('#createpasswordNext');
-      await page.waitForTimeout(1000);
+      await delay(1000);
       
       const monthSelect = await page.$('select[id="month"]');
       if (monthSelect) await page.select('select[id="month"]', userInfo.birthday.month.toString());
@@ -132,13 +134,13 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
       
       const nextButton = await page.$('#birthdaygenderNext');
       if (nextButton) await nextButton.click();
-      await page.waitForTimeout(1000);
+      await delay(1000);
       
       try {
         const skipButtons = await page.$x("//button[contains(text(), 'Skip')] | //button[contains(text(), 'Not now')]");
         if (skipButtons.length > 0) {
           await skipButtons[0].evaluate((el: Node) => (el instanceof HTMLElement && el.click()));
-          await page.waitForTimeout(500);
+          await delay(500);
         }
       } catch {}
       
