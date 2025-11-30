@@ -28,21 +28,41 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
     const proxy = await getProxy();
     
     if (process.env.VERCEL === '1') {
-      const chromium = await import('@sparticuz/chromium');
-      const chromiumModule = chromium.default || chromium;
-      
-      const executablePath = await chromiumModule.executablePath();
-      const args = chromiumModule.args || [];
-      
-      if (proxy) args.push(`--proxy-server=${proxy}`);
-      
-      browser = await puppeteer.default.launch({
-        args: args,
-        defaultViewport: chromiumModule.defaultViewport || { width: 1280, height: 720 },
-        executablePath: executablePath,
-        headless: chromiumModule.headless !== false,
-        ignoreHTTPSErrors: true,
-      });
+      // Try chrome-aws-lambda (older, may work better on Vercel)
+      try {
+        const chromium = await import('chrome-aws-lambda');
+        const chromiumModule = chromium.default || chromium;
+        
+        const executablePath = await chromiumModule.executablePath();
+        const args = chromiumModule.args || [];
+        
+        if (proxy) args.push(`--proxy-server=${proxy}`);
+        
+        browser = await puppeteer.default.launch({
+          args: args,
+          defaultViewport: chromiumModule.defaultViewport || { width: 1280, height: 720 },
+          executablePath: executablePath,
+          headless: chromiumModule.headless !== false,
+          ignoreHTTPSErrors: true,
+        });
+      } catch (chromeError) {
+        // Fallback to @sparticuz/chromium
+        const chromium = await import('@sparticuz/chromium');
+        const chromiumModule = chromium.default || chromium;
+        
+        const executablePath = await chromiumModule.executablePath();
+        const args = chromiumModule.args || [];
+        
+        if (proxy) args.push(`--proxy-server=${proxy}`);
+        
+        browser = await puppeteer.default.launch({
+          args: args,
+          defaultViewport: chromiumModule.defaultViewport || { width: 1280, height: 720 },
+          executablePath: executablePath,
+          headless: chromiumModule.headless !== false,
+          ignoreHTTPSErrors: true,
+        });
+      }
     } else {
       const args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'];
       if (proxy) args.push(`--proxy-server=${proxy}`);
