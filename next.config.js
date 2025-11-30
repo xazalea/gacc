@@ -1,12 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
+    serverComponentsExternalPackages: ['playwright-core'],
   },
   webpack: (config, { isServer }) => {
     if (isServer) {
-      // Exclude chromium from bundle - it's loaded at runtime
-      config.externals = [...(config.externals || []), '@sparticuz/chromium'];
+      config.externals = [...(config.externals || []), 'playwright-core'];
       config.optimization = { ...config.optimization, minimize: true };
     }
     return config;
