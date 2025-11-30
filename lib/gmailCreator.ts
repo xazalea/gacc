@@ -14,16 +14,9 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
   let executablePath: string | undefined;
   
   if (process.env.VERCEL === '1') {
-    try {
-      const chromium = await import('@sparticuz/chromium-min');
-      const chromiumModule = (chromium.default || chromium) as any;
-      executablePath = await chromiumModule.executablePath();
-    } catch (error) {
-      // Fallback: try regular chromium if chromium-min fails
-      const chromium = await import('@sparticuz/chromium');
-      const chromiumModule = (chromium.default || chromium) as any;
-      executablePath = await chromiumModule.executablePath();
-    }
+    const chromium = await import('@sparticuz/chromium');
+    const chromiumModule = (chromium.default || chromium) as any;
+    executablePath = await chromiumModule.executablePath();
   } else {
     executablePath = process.env.CHROME_PATH;
   }
