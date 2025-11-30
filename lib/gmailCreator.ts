@@ -14,16 +14,19 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
   let browser: any;
   
   if (process.env.VERCEL === '1') {
-    // Use @sparticuz/chromium with exact pattern it expects
+    // Use @sparticuz/chromium - must use exact pattern
     const chromium = await import('@sparticuz/chromium');
+    // chromium is the default export, not chromium.default
     const chromiumModule = chromium.default || chromium;
+    
+    // Get executable path first
+    const executablePath = await chromiumModule.executablePath();
     
     browser = await puppeteer.default.launch({
       args: chromiumModule.args,
       defaultViewport: chromiumModule.defaultViewport,
-      executablePath: await chromiumModule.executablePath(),
+      executablePath: executablePath,
       headless: chromiumModule.headless,
-      ignoreHTTPSErrors: true,
     });
   } else {
     browser = await puppeteer.default.launch({
