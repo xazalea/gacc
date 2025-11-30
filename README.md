@@ -114,14 +114,20 @@ This setup uses `@sparticuz/chromium-min` which is a minimal Chromium build desi
    - Vercel Pro: 60 seconds (recommended)
 3. **Memory**: Set to 1024MB in `vercel.json` for optimal performance
 
-**Fixing libnss3.so Error:**
+**Fixing libnss3.so Error (CRITICAL):**
 
-If you encounter the `libnss3.so: cannot open shared object file` error, add this environment variable in Vercel:
+The `libnss3.so` error occurs because Vercel's runtime lacks system libraries. **You MUST add this environment variable:**
 
-- **Key**: `AWS_LAMBDA_JS_RUNTIME`
-- **Value**: `nodejs22.x`
+1. Go to Vercel Dashboard → Your Project → Settings → Environment Variables
+2. Add:
+   - **Key**: `AWS_LAMBDA_JS_RUNTIME`
+   - **Value**: `nodejs22.x`
+   - **Environment**: Production, Preview, Development (all)
+3. **Redeploy** your project
 
-This helps Vercel include the necessary system libraries for Chromium. Go to your Vercel project settings → Environment Variables → Add the variable above.
+**Alternative**: If the error persists, the `vercel.json` file already includes this, but you may need to set it manually in Vercel dashboard as well.
+
+**Note**: This is a known limitation of @sparticuz/chromium on Vercel. The package is designed for AWS Lambda, not Vercel's runtime.
 
 ## Project Structure
 
