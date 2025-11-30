@@ -17,7 +17,6 @@ const nextConfig = {
         ...(config.externals || []),
         '@sparticuz/chromium-min',
         'puppeteer-extra',
-        'puppeteer-extra-plugin',
         'puppeteer-extra-plugin-stealth',
         'clone-deep',
         'merge-deep',
