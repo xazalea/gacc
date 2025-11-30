@@ -23,8 +23,11 @@ export async function createGmailAccount(userInfo: UserInfo, onStatusUpdate?: (s
     process.env.AWS_LAMBDA_JS_RUNTIME = 'nodejs22.x';
   }
   
+  // Dynamically import stealth plugin to avoid build-time resolution issues
   const puppeteerCore = await import('puppeteer-core');
   const puppeteerExtra = await import('puppeteer-extra');
+  
+  // @ts-ignore
   const StealthPlugin = await import('puppeteer-extra-plugin-stealth');
 
   const puppeteer = puppeteerExtra.default || puppeteerExtra;
