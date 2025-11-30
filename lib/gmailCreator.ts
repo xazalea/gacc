@@ -23,19 +23,8 @@ export async function createGmailAccount(userInfo: UserInfo, onStatusUpdate?: (s
     process.env.AWS_LAMBDA_JS_RUNTIME = 'nodejs22.x';
   }
   
-  // Dynamically import stealth plugin to avoid build-time resolution issues
-  const puppeteerCore = await import('puppeteer-core');
-  const puppeteerExtra = await import('puppeteer-extra');
-  
-  // @ts-ignore
-  const StealthPlugin = await import('puppeteer-extra-plugin-stealth');
-
-  const puppeteer = puppeteerExtra.default || puppeteerExtra;
-  const stealth = StealthPlugin.default || StealthPlugin;
-  
-  // Configure puppeteer-extra to use puppeteer-core
-  // @ts-ignore
-  puppeteer.use(stealth());
+  // Use standard puppeteer-core, no extra plugins to keep it small and compatible
+  const puppeteer = await import('puppeteer-core');
   
   const MAX_RETRIES = 4; // 3 proxy attempts + 1 direct fallback
   let lastError: any;
@@ -74,12 +63,13 @@ export async function createGmailAccount(userInfo: UserInfo, onStatusUpdate?: (s
           '--disable-dev-shm-usage',
           '--single-process',
           '--disable-gpu',
+          '--disable-blink-features=AutomationControlled', // Critical for stealth
           '--disable-features=IsolateOrigins,site-per-process',
         ];
         
         if (proxy) args.push(`--proxy-server=${proxy}`);
         
-        browser = await puppeteer.launch({
+        browser = await puppeteer.default.launch({
           args: args,
           defaultViewport: chromiumModule.defaultViewport || { width: 1280, height: 720 },
           executablePath: executablePath,
@@ -88,9 +78,14 @@ export async function createGmailAccount(userInfo: UserInfo, onStatusUpdate?: (s
         } as any);
       } else {
         status('Launching Chrome (Local)...');
-        const args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'];
+        const args = [
+          '--no-sandbox', 
+          '--disable-setuid-sandbox', 
+          '--disable-dev-shm-usage',
+          '--disable-blink-features=AutomationControlled', // Critical for stealth
+        ];
         if (proxy) args.push(`--proxy-server=${proxy}`);
-        browser = await puppeteer.launch({
+        browser = await puppeteer.default.launch({
           args,
           executablePath: process.env.CHROME_PATH,
           headless: true,
@@ -99,6 +94,13 @@ export async function createGmailAccount(userInfo: UserInfo, onStatusUpdate?: (s
       }
 
       const page = await browser.newPage();
+      
+      // Manual Stealth: Remove navigator.webdriver
+      await page.evaluateOnNewDocument(() => {
+        Object.defineProperty(navigator, 'webdriver', {
+          get: () => undefined,
+        });
+      });
       
       // Set a realistic User Agent to avoid basic bot detection
       await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
