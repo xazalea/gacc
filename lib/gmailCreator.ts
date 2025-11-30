@@ -18,14 +18,22 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
   
   const puppeteer = await import('puppeteer-core');
   
-  const MAX_RETRIES = 3;
+  const MAX_RETRIES = 4; // 3 proxy attempts + 1 direct fallback
   let lastError: any;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     let browser: any = null;
     try {
-      const proxy = await getProxy();
-      console.log(`Attempt ${attempt}/${MAX_RETRIES} using proxy: ${proxy || 'none'}`);
+      // Use proxy for first 3 attempts, direct connection for last attempt
+      const useProxy = attempt < MAX_RETRIES;
+      const proxy = useProxy ? await getProxy() : undefined;
+      
+      console.log(`Attempt ${attempt}/${MAX_RETRIES} (${useProxy ? 'Proxy: ' + proxy : 'Direct Connection'})`);
+
+      if (useProxy && !proxy) {
+        console.log('No proxy available, skipping to next attempt');
+        continue;
+      }
 
       if (process.env.VERCEL === '1') {
         const chromium = await import('@sparticuz/chromium-min');
@@ -45,6 +53,7 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
           '--disable-dev-shm-usage',
           '--single-process',
           '--disable-gpu',
+          '--disable-features=IsolateOrigins,site-per-process',
         ];
         
         if (proxy) args.push(`--proxy-server=${proxy}`);
