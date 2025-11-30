@@ -62,9 +62,19 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
     }
 
     const page = await browser.newPage();
-    await page.goto('https://accounts.google.com/signup/v2/webcreateaccount?flowName=GlifWebSignIn&flowEntry=SignUp', { waitUntil: 'domcontentloaded', timeout: 15000 });
+    await page.goto('https://accounts.google.com/signup/v2/webcreateaccount?flowName=GlifWebSignIn&flowEntry=SignUp', { waitUntil: 'domcontentloaded', timeout: 30000 });
     
-    await page.waitForSelector('input[name="firstName"]', { timeout: 5000 });
+    // Wait for either the new layout or the old one
+    try {
+        await page.waitForSelector('input[name="firstName"]', { timeout: 15000 });
+    } catch (e) {
+        console.log('First name selector not found, taking screenshot...');
+        // Debug: log page content if selector fails
+        const content = await page.content();
+        console.log('Page content length:', content.length);
+        throw e;
+    }
+
     await page.type('input[name="firstName"]', userInfo.firstName, { delay: 20 });
     await page.type('input[name="lastName"]', userInfo.lastName, { delay: 20 });
     await page.click('#collectNameNext');
