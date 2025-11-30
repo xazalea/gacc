@@ -11,43 +11,59 @@ export interface GmailAccount {
 }
 
 export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccount> {
-  // Use Playwright instead of Puppeteer - better Vercel compatibility
-  const { chromium } = await import('playwright-core');
-  const proxy = await getProxy();
-  
-  // Set environment variable in code
-  if (process.env.VERCEL === '1') {
+  // Set environment variable in code before importing chromium
+  if (process.env.VERCEL === '1' && !process.env.AWS_LAMBDA_JS_RUNTIME) {
     process.env.AWS_LAMBDA_JS_RUNTIME = 'nodejs22.x';
   }
   
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process'],
-    proxy: proxy ? { server: proxy } : undefined,
-  });
+  const puppeteer = await import('puppeteer-core');
+  const proxy = await getProxy();
+  let browser: any;
+  
+  if (process.env.VERCEL === '1') {
+    const chromium = await import('@sparticuz/chromium');
+    const chromiumModule = chromium.default || chromium;
+    
+    const executablePath = await chromiumModule.executablePath();
+    const args = chromiumModule.args || [];
+    
+    if (proxy) args.push(`--proxy-server=${proxy}`);
+    
+    browser = await puppeteer.default.launch({
+      args: args,
+      defaultViewport: chromiumModule.defaultViewport || { width: 1280, height: 720 },
+      executablePath: executablePath,
+      headless: chromiumModule.headless !== false,
+      ignoreHTTPSErrors: true,
+    });
+  } else {
+    const args = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'];
+    if (proxy) args.push(`--proxy-server=${proxy}`);
+    browser = await puppeteer.default.launch({
+      args,
+      executablePath: process.env.CHROME_PATH,
+      headless: true,
+    });
+  }
 
-  const context = await browser.newContext({
-    viewport: { width: 1280, height: 720 },
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  });
-
-  const page = await context.newPage();
+  const page = await browser.newPage();
   await page.goto('https://accounts.google.com/signup/v2/webcreateaccount?flowName=GlifWebSignIn&flowEntry=SignUp', { waitUntil: 'domcontentloaded', timeout: 15000 });
   
   await page.waitForSelector('input[name="firstName"]', { timeout: 5000 });
-  await page.fill('input[name="firstName"]', userInfo.firstName);
-  await page.fill('input[name="lastName"]', userInfo.lastName);
+  await page.type('input[name="firstName"]', userInfo.firstName, { delay: 20 });
+  await page.type('input[name="lastName"]', userInfo.lastName, { delay: 20 });
   await page.click('#collectNameNext');
   await page.waitForTimeout(300);
   
   await page.waitForSelector('input[name="Username"]', { timeout: 5000 });
-  await page.fill('input[name="Username"]', userInfo.username);
+  await page.type('input[name="Username"]', userInfo.username, { delay: 20 });
   await page.click('#next');
   await page.waitForTimeout(1000);
   
-  if (!(await page.locator('input[name="Passwd"]').first().isVisible().catch(() => false))) {
+  if (!(await page.$('input[name="Passwd"]'))) {
     const newUsername = `${userInfo.firstName.toLowerCase()}.${userInfo.lastName.toLowerCase()}${Math.floor(100000 + Math.random() * 900000)}`;
-    await page.fill('input[name="Username"]', newUsername);
+    await page.click('input[name="Username"]', { clickCount: 3 });
+    await page.type('input[name="Username"]', newUsername, { delay: 20 });
     await page.click('#next');
     await page.waitForTimeout(1000);
     userInfo.username = newUsername;
@@ -55,41 +71,34 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
   }
   
   await page.waitForSelector('input[name="Passwd"]', { timeout: 5000 });
-  await page.fill('input[name="Passwd"]', userInfo.password);
-  await page.fill('input[name="PasswdAgain"]', userInfo.password);
+  await page.type('input[name="Passwd"]', userInfo.password, { delay: 20 });
+  await page.type('input[name="PasswdAgain"]', userInfo.password, { delay: 20 });
   await page.click('#createpasswordNext');
   await page.waitForTimeout(1000);
   
-  const monthSelect = page.locator('select[id="month"]');
-  if (await monthSelect.isVisible().catch(() => false)) {
-    await monthSelect.selectOption(userInfo.birthday.month.toString());
-  }
+  const monthSelect = await page.$('select[id="month"]');
+  if (monthSelect) await page.select('select[id="month"]', userInfo.birthday.month.toString());
   
   await page.waitForSelector('input[id="day"]', { timeout: 5000 });
-  await page.fill('input[id="day"]', userInfo.birthday.day.toString());
-  await page.fill('input[id="year"]', userInfo.birthday.year.toString());
+  await page.type('input[id="day"]', userInfo.birthday.day.toString(), { delay: 20 });
+  await page.type('input[id="year"]', userInfo.birthday.year.toString(), { delay: 20 });
   
-  const genderSelect = page.locator('select[id="gender"]');
-  if (await genderSelect.isVisible().catch(() => false)) {
-    await genderSelect.selectOption('1');
-  }
+  const genderSelect = await page.$('select[id="gender"]');
+  if (genderSelect) await page.select('select[id="gender"]', '1');
   
-  const nextButton = page.locator('#birthdaygenderNext');
-  if (await nextButton.isVisible().catch(() => false)) {
-    await nextButton.click();
-  }
+  const nextButton = await page.$('#birthdaygenderNext');
+  if (nextButton) await nextButton.click();
   await page.waitForTimeout(1000);
   
   try {
-    const skipButton = page.locator('button:has-text("Skip"), button:has-text("Not now")').first();
-    if (await skipButton.isVisible().catch(() => false)) {
-      await skipButton.click();
+    const skipButtons = await page.$x("//button[contains(text(), 'Skip')] | //button[contains(text(), 'Not now')]");
+    if (skipButtons.length > 0) {
+      await skipButtons[0].evaluate((el: Node) => (el instanceof HTMLElement && el.click()));
       await page.waitForTimeout(500);
     }
   } catch {}
   
   await page.close();
-  await context.close();
   await browser.close();
   
   return {

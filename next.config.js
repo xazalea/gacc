@@ -1,11 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ['playwright-core'],
+    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
   },
   webpack: (config, { isServer }) => {
     if (isServer) {
-      config.externals = [...(config.externals || []), 'playwright-core'];
+      config.externals = [...(config.externals || []), '@sparticuz/chromium'];
       config.optimization = { ...config.optimization, minimize: true };
     }
     return config;
