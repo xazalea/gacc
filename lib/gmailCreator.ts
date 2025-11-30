@@ -22,7 +22,9 @@ async function getChromiumExecutable(): Promise<string> {
   // Dynamic import to reduce initial bundle size
   // Using chromium-min which is much smaller (<30MB vs ~50MB)
   const chromium = await import('@sparticuz/chromium-min');
-  return await chromium.executablePath();
+  // chromium-min exports differently - access via default
+  const chromiumModule = chromium.default || chromium;
+  return await chromiumModule.executablePath();
 }
 
 /**
