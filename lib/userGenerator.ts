@@ -14,7 +14,9 @@ export interface UserInfo {
 export function generateUserInfo(): UserInfo {
   const firstName = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)];
   const lastName = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
-  const username = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${Math.floor(10000 + Math.random() * 90000)}`;
+  const randomChars = Array.from({ length: 4 }, () => 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]).join('');
+  const randomDigits = Math.floor(100000 + Math.random() * 900000);
+  const username = `${firstName.toLowerCase()}.${lastName.toLowerCase()}.${randomChars}${randomDigits}`;
   const password = Array.from({ length: 12 }, () => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Math.floor(Math.random() * 62)]).join('');
   const year = new Date().getFullYear() - Math.floor(Math.random() * 47 + 18);
   

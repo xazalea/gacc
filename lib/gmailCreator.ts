@@ -113,15 +113,52 @@ export async function createGmailAccount(userInfo: UserInfo, onStatusUpdate?: (s
       await page.click('#collectNameNext');
       await delay(1000); // Increased delay after click
       
+      status('Checking next step...');
+      // Race condition to check which page comes next: Username, Birthday, or Phone
+      const nextStep = await Promise.race([
+          page.waitForSelector('input[name="Username"]', { timeout: 10000 }).then(() => 'username'),
+          page.waitForSelector('select[id="month"]', { timeout: 10000 }).then(() => 'birthday'),
+          page.waitForSelector('input[type="tel"]', { timeout: 10000 }).then(() => 'phone'),
+          delay(10000).then(() => 'timeout')
+      ]);
+      
+      if (nextStep === 'phone') {
+          throw new Error('Phone verification required immediately. Proxy flagged.');
+      }
+      
+      if (nextStep === 'birthday') {
+        status('Birthday field detected first...');
+        const monthSelect = await page.$('select[id="month"]');
+        if (monthSelect) await page.select('select[id="month"]', userInfo.birthday.month.toString());
+        
+        await page.waitForSelector('input[id="day"]', { timeout: 15000 });
+        await page.type('input[id="day"]', userInfo.birthday.day.toString(), { delay: 20 });
+        await page.type('input[id="year"]', userInfo.birthday.year.toString(), { delay: 20 });
+        
+        const genderSelect = await page.$('select[id="gender"]');
+        if (genderSelect) await page.select('select[id="gender"]', '1');
+        
+        const nextButton = await page.$('#birthdaygenderNext');
+        if (nextButton) await nextButton.click();
+        await delay(1000);
+        
+        // After birthday, it should be username
+        status('Waiting for username field...');
+        await page.waitForSelector('input[name="Username"]', { timeout: 15000 });
+      } else if (nextStep === 'timeout') {
+        throw new Error('Timed out waiting for next step after name');
+      }
+
       status('Entering username...');
-      await page.waitForSelector('input[name="Username"]', { timeout: 15000 });
+      // Ensure selector exists before typing if we came from standard flow
+      if (nextStep === 'username') await page.waitForSelector('input[name="Username"]', { timeout: 15000 });
       await page.type('input[name="Username"]', userInfo.username, { delay: 20 });
       await page.click('#next');
       await delay(1000);
       
       if (!(await page.$('input[name="Passwd"]'))) {
         status('Username taken, generating suggestion...');
-        const newUsername = `${userInfo.firstName.toLowerCase()}.${userInfo.lastName.toLowerCase()}${Math.floor(100000 + Math.random() * 900000)}`;
+        const newUsername = `${userInfo.firstName.toLowerCase()}.${userInfo.lastName.toLowerCase()}${Math.floor(10000000 + Math.random() * 90000000)}`;
         await page.click('input[name="Username"]', { clickCount: 3 });
         await page.type('input[name="Username"]', newUsername, { delay: 20 });
         await page.click('#next');
@@ -137,20 +174,24 @@ export async function createGmailAccount(userInfo: UserInfo, onStatusUpdate?: (s
       await page.click('#createpasswordNext');
       await delay(1000);
       
-      status('Entering birthday...');
-      const monthSelect = await page.$('select[id="month"]');
-      if (monthSelect) await page.select('select[id="month"]', userInfo.birthday.month.toString());
-      
-      await page.waitForSelector('input[id="day"]', { timeout: 15000 });
-      await page.type('input[id="day"]', userInfo.birthday.day.toString(), { delay: 20 });
-      await page.type('input[id="year"]', userInfo.birthday.year.toString(), { delay: 20 });
-      
-      const genderSelect = await page.$('select[id="gender"]');
-      if (genderSelect) await page.select('select[id="gender"]', '1');
-      
-      const nextButton = await page.$('#birthdaygenderNext');
-      if (nextButton) await nextButton.click();
-      await delay(1000);
+      // Only do birthday if we haven't done it yet
+      if (nextStep === 'username') {
+        status('Entering birthday...');
+        const monthSelect = await page.$('select[id="month"]');
+        // ... (rest of birthday logic)
+        if (monthSelect) await page.select('select[id="month"]', userInfo.birthday.month.toString());
+        
+        await page.waitForSelector('input[id="day"]', { timeout: 15000 });
+        await page.type('input[id="day"]', userInfo.birthday.day.toString(), { delay: 20 });
+        await page.type('input[id="year"]', userInfo.birthday.year.toString(), { delay: 20 });
+        
+        const genderSelect = await page.$('select[id="gender"]');
+        if (genderSelect) await page.select('select[id="gender"]', '1');
+        
+        const nextButton = await page.$('#birthdaygenderNext');
+        if (nextButton) await nextButton.click();
+        await delay(1000);
+      }
       
       try {
         const skipButtons = await page.$x("//button[contains(text(), 'Skip')] | //button[contains(text(), 'Not now')]");
