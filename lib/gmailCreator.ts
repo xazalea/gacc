@@ -22,10 +22,14 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
   
   try {
     if (process.env.VERCEL === '1') {
-      const chromium = await import('@sparticuz/chromium');
+      const chromium = await import('@sparticuz/chromium-min');
       const chromiumModule = chromium.default || chromium;
       
-      const executablePath = await chromiumModule.executablePath();
+      // Use a specific download URL for the pack if needed, or rely on default behavior
+    // For -min package, we need to provide the pack URL or it will try to download from default location
+    const executablePath = await chromiumModule.executablePath(
+      "https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar"
+    );
       
       // Use proper args from chromium module
       const args = [
