@@ -23,7 +23,14 @@ export async function createGmailAccount(userInfo: UserInfo): Promise<GmailAccou
     
     if (isProduction) {
       browser = await puppeteer.launch({
-        args: chromium.args,
+        args: [
+          ...chromium.args,
+          '--disable-gpu',
+          '--disable-dev-shm-usage',
+          '--disable-setuid-sandbox',
+          '--no-sandbox',
+          '--single-process',
+        ],
         defaultViewport: chromium.defaultViewport,
         executablePath: await chromium.executablePath(),
         headless: chromium.headless,
