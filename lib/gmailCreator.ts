@@ -26,13 +26,13 @@ export async function createGmailAccount(userInfo: UserInfo, onStatusUpdate?: (s
   // Use standard puppeteer-core, no extra plugins to keep it small and compatible
   const puppeteer = await import('puppeteer-core');
   
-  const MAX_RETRIES = 4; // 3 proxy attempts + 1 direct fallback
+  const MAX_RETRIES = 10; // Increased retries for flaky proxies
   let lastError: any;
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     let browser: any = null;
     try {
-      // Use proxy for first 3 attempts, direct connection for last attempt
+      // Use proxy for first 9 attempts, direct connection for last attempt
       const useProxy = attempt < MAX_RETRIES;
       const proxy = useProxy ? await getProxy() : undefined;
       
@@ -65,6 +65,7 @@ export async function createGmailAccount(userInfo: UserInfo, onStatusUpdate?: (s
           '--disable-gpu',
           '--disable-blink-features=AutomationControlled', // Critical for stealth
           '--disable-features=IsolateOrigins,site-per-process',
+          '--window-size=1920,1080',
         ];
         
         if (proxy) args.push(`--proxy-server=${proxy}`);
@@ -83,6 +84,7 @@ export async function createGmailAccount(userInfo: UserInfo, onStatusUpdate?: (s
           '--disable-setuid-sandbox', 
           '--disable-dev-shm-usage',
           '--disable-blink-features=AutomationControlled', // Critical for stealth
+          '--window-size=1920,1080',
         ];
         if (proxy) args.push(`--proxy-server=${proxy}`);
         browser = await puppeteer.default.launch({
@@ -95,15 +97,40 @@ export async function createGmailAccount(userInfo: UserInfo, onStatusUpdate?: (s
 
       const page = await browser.newPage();
       
-      // Manual Stealth: Remove navigator.webdriver
+      // Comprehensive Manual Stealth Evasions
       await page.evaluateOnNewDocument(() => {
+        // Pass the Webdriver Test.
         Object.defineProperty(navigator, 'webdriver', {
-          get: () => undefined,
+          get: () => false,
         });
+
+        // Overwrite the `plugins` property to use a custom getter.
+        Object.defineProperty(navigator, 'plugins', {
+          get: () => [1, 2, 3, 4, 5],
+        });
+
+        // Overwrite the `languages` property to use a custom getter.
+        Object.defineProperty(navigator, 'languages', {
+          get: () => ['en-US', 'en'],
+        });
+
+        // Mock permissions
+        const originalQuery = (window.navigator as any).permissions.query;
+        (window.navigator as any).permissions.query = (parameters: any) => (
+          parameters.name === 'notifications' ?
+            Promise.resolve({ state: Notification.permission } as PermissionStatus) :
+            originalQuery(parameters)
+        );
+      });
+
+      // Randomize viewport slightly to look more human
+      await page.setViewport({
+        width: 1280 + Math.floor(Math.random() * 100),
+        height: 720 + Math.floor(Math.random() * 100),
       });
       
-      // Set a realistic User Agent to avoid basic bot detection
-      await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      // Set a realistic generic Windows User Agent
+      await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
 
       status('Navigating to Google Signup...');
       await page.goto('https://accounts.google.com/signup/v2/webcreateaccount?flowName=GlifWebSignIn&flowEntry=SignUp', { waitUntil: 'domcontentloaded', timeout: 30000 });
